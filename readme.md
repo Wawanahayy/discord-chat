@@ -14,4 +14,20 @@ git clone https://github.com/Wawanahayy/discord-chat && cd discord-chat
 ```
 pip install -r requirements.txt
 ```
+change token
+```
+nano token.txt 
+```
+or on folder token.txt
 
+change messages 1 line 1 messages
+```
+nano messages.txt
+```
+
+run python run.py 
+```
+or 
+```
+python3 run.py
+```
