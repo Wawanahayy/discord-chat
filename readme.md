@@ -27,7 +27,7 @@ nano messages.txt
 ### apikey chatgpt use 1 or 3 
 chatgpt 
 ```
-openai_key.txt
+nano openai_key.txt
 ```
 https://platform.openai.com/api-keys
 
@@ -39,7 +39,7 @@ https://aistudio.google.com/app/apikey
 
 openrouter
 ```
-openrouter_key.txt
+nano openrouter_key.txt
 ```
 
 https://openrouter.ai/settings/keys
