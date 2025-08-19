@@ -26,7 +26,7 @@ nano messages.txt
 ```
 ### RUN
 ```
-python run.py 
+python main.py 
 ```
 ### or 
 
