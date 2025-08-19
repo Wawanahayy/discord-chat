@@ -53,5 +53,5 @@ python main.py
 ### or 
 
 ```
-python3 run.py
+python run.py
 ```
