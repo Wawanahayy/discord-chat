@@ -24,6 +24,16 @@ nano token.txt
 ```
 nano messages.txt
 ```
+### apikey chatgpt use 1 or 3 
+chatgpt 
+https://platform.openai.com/api-keys
+
+gemini is free but any limit
+https://aistudio.google.com/app/apikey
+
+openrouter
+https://openrouter.ai/settings/keys
+
 ### RUN
 ```
 python main.py 
