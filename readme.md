@@ -26,13 +26,25 @@ nano messages.txt
 ```
 ### apikey chatgpt use 1 or 3 
 chatgpt 
+```
+openai_key.txt
+```
 https://platform.openai.com/api-keys
 
-gemini is free but any limit
+gemini is free but any limit`
+```
+nano gemini_key.txt
+```
 https://aistudio.google.com/app/apikey
 
 openrouter
+```
+openrouter_key.txt
+```
+
 https://openrouter.ai/settings/keys
+
+
 
 ### RUN
 ```
