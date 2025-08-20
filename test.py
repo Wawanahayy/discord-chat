@@ -426,7 +426,6 @@ def generate_ai_response(user_message, display_name, retry_count=0):
         "Reply in English, casually and briefly (4–15 words). "
         "Do not include the user's name. "
         "Use at most one emoji only if it genuinely adds tone. "
-        + emoji_rule
     )
     # --- OpenRouter ---
     try:
