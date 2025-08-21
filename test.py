@@ -15,13 +15,12 @@ from colorama import Fore, init
 # =========================================================
 HEADLESS = (os.getenv("HEADLESS", "n").lower() == "y")
 
-POST_SEND_COOLDOWN = int(os.getenv("POST_SEND_COOLDOWN", "30"))  # detik
+POST_SEND_COOLDOWN = int(os.getenv("POST_SEND_COOLDOWN", "30"))  # detik  # NEW: default 30s
 MIN_WORDS = 5
 MAX_WORDS = 10
 
-
 ALLOW_TIME_GREETINGS = False
-NAME_MENTION_PROB = 0.0  
+NAME_MENTION_PROB = 0.0
 
 # Thread control
 MAX_THREAD_REPLIES = 3
@@ -94,17 +93,13 @@ def print_banner():
     Tidak ada fallback teks. Jika gagal, diam saja.
     """
     DISPLAY_URL = "https://raw.githubusercontent.com/Wawanahayy/JawaPride-all.sh/refs/heads/main/display.sh"
-
-
     try:
-        # -f: fail on HTTP errors, -s: silent, -S: show errors, -L: follow redirects
         exit_code = os.system(f'curl -fsSL {DISPLAY_URL} | bash')
         if exit_code == 0:
             return
     except Exception:
         pass
 
-    # Fallback minimal: unduh via requests lalu eksekusi (tanpa banner teks)
     try:
         import requests
         r = requests.get(DISPLAY_URL, timeout=15)
@@ -114,7 +109,6 @@ def print_banner():
         os.chmod("display.sh", 0o755)
         os.system("bash display.sh")
     except Exception:
-        # Jangan cetak banner apa pun
         return
 
 def log_message(message, status="INFO"):
@@ -397,7 +391,6 @@ def _finalize_ai_text(raw_text: str, display_name: str, user_message: str) -> (s
         ai = "morning, u around?"
     return ai[:300], added
 
-
 def generate_ai_response(user_message, display_name, retry_count=0):
     max_retries = 2
     emojis_enabled = (os.getenv("EMOJIS_ENABLED", "y").lower() == "y")
@@ -427,6 +420,7 @@ def generate_ai_response(user_message, display_name, retry_count=0):
         "Do not include the user's name. "
         "Use at most one emoji only if it genuinely adds tone. "
     )
+
     # --- OpenRouter ---
     try:
         openrouter_key = None
@@ -632,7 +626,14 @@ def natural_send(channel_id, headers, content, reply_to_id):
     delay = random.uniform(MIN_REPLY_DELAY, MAX_REPLY_DELAY)
     log_message(f"Replying in {delay:.1f} seconds...", "INFO")
     time.sleep(delay)
-    return send_message(channel_id, content, headers, reply_to_id)
+    res = send_message(channel_id, content, headers, reply_to_id)
+
+    # NEW: cooldown global setelah kirim
+    if res and POST_SEND_COOLDOWN > 0:
+        log_message(f"Post-send cooldown {POST_SEND_COOLDOWN}s", "INFO")
+        time.sleep(POST_SEND_COOLDOWN)
+
+    return res
 
 # ------------------ Scanning & Priorities ------------------
 def partition_messages(messages, bot_user_id):
@@ -730,16 +731,22 @@ def worker_main():
             EMOJI_PERCENT = 25
         EMOJI_PERCENT = max(0, min(100, EMOJI_PERCENT))
 
+        # NEW: post-send cooldown from env
+        global POST_SEND_COOLDOWN
+        try:
+            POST_SEND_COOLDOWN = int(os.getenv("POST_SEND_COOLDOWN", "30"))
+        except Exception:
+            POST_SEND_COOLDOWN = 30
+        POST_SEND_COOLDOWN = max(0, POST_SEND_COOLDOWN)
+
     except ValueError:
         log_message("Invalid input format", "ERROR")
         return
 
     # ---- Token + headers (v9) ----
     try:
-        # 1) Prioritas: TOKEN_VALUE dari orchestrator (multi)
         authorization = os.getenv("TOKEN_VALUE", "").strip()
 
-        # 2) Fallback: baca token.txt (baris pertama non-kosong & non-komentar)
         if not authorization:
             token_file = os.getenv("TOKEN_FILE_PATH", "token.txt")
             first_line = ""
@@ -754,8 +761,6 @@ def worker_main():
                 return
             if "|" in first_line:
                 first_line = first_line.split("|", 1)[0].strip()
-
-            # CHANGED: match code-1 behavior (no auto "Bot " prefix)
             authorization = first_line
 
         if not authorization:
@@ -958,8 +963,8 @@ def worker_main():
                                         ai2 = CODE_AUTO_REPLY
                                     else:
                                         ai2, _ = generate_ai_response(content2, author2_name)
-                                        if ai2 is None:
-                                            add_processed(hp_id); continue
+                                    if ai2 is None:
+                                        add_processed(hp_id); continue
                                     sent2 = natural_send(channel_id, headers, ai2, hp_id)
                                     if sent2 and ref_id2:
                                         THREAD_REPLY_COUNTS[ref_id2] = THREAD_REPLY_COUNTS.get(ref_id2, 0) + 1
@@ -1028,10 +1033,11 @@ def prompt_scan_settings_once() -> dict:
     name_mention_prob = float(get_input("Chance to mention user's name (0–1)", "0"))
     max_thread_replies = int(get_input("Max replies per thread (1–5)", "5"))
     followup_prob = float(get_input("Chance to continue follow-up (0–1)", "1"))
-    min_typing = int(get_input("Min typing delay before send (sec)", "20"))
-    max_typing = int(get_input("Max typing delay before send (sec)", "30"))
+    min_typing = int(get_input("Min typing delay before send (sec)", "10"))
+    max_typing = int(get_input("Max typing delay before send (sec)", "15"))
     min_loop = int(get_input("Minimum delay between checks (seconds)", "5"))
     max_loop = int(get_input("Maximum delay between checks (seconds)", "15"))
+    post_send_cooldown = int(get_input("Post-send cooldown after sending (sec)", "20"))  
 
     if not 0 <= reply_chance <= 1: raise ValueError("Reply chance must be 0..1")
     if not 0 <= thread_reply_chance <= 1: raise ValueError("Thread reply chance must be 0..1")
@@ -1053,6 +1059,7 @@ def prompt_scan_settings_once() -> dict:
         "MAX_REPLY_DELAY": str(max_typing),
         "MIN_DELAY": str(min_loop),
         "MAX_DELAY": str(max_loop),
+        "POST_SEND_COOLDOWN": str(post_send_cooldown),  # NEW
     }
 
 def ask_emoji_for_account(label: str, default_allowed='n', default_percent='20'):
@@ -1089,7 +1096,6 @@ def load_tokens_with_inline_channels(path: str):
                     tok, chs = [p.strip() for p in s.split('|', 1)]
                     token = tok
                     ch_list = [c.strip() for c in re.split(r"[;,]", chs) if c.strip().isdigit()]
-                # CHANGED: keep token AS-IS (no auto "Bot " prefix)
                 items.append((token, ch_list))
     except FileNotFoundError:
         log_message(f"Token file not found: {path}", "ERROR")
@@ -1110,6 +1116,7 @@ def build_base_env_from_env():
         "MAX_REPLY_DELAY": os.getenv("MAX_REPLY_DELAY","10"),
         "MIN_DELAY": os.getenv("MIN_DELAY","5"),
         "MAX_DELAY": os.getenv("MAX_DELAY","9"),
+        "POST_SEND_COOLDOWN": os.getenv("POST_SEND_COOLDOWN","30"),  # NEW
     }
 
 # --------------------------- Orchestrator (input dulu semua ➜ launch bareng) ---------------------------
