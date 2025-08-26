@@ -20,10 +20,6 @@ nano token.txt
 ```
 ### or on folder token.txt
 
-### change messages 1 line 1 messages
-```
-nano messages.txt
-```
 ### apikey chatgpt use 1 or 3 
 chatgpt 
 ```
