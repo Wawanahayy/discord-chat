@@ -44,7 +44,7 @@ https://openrouter.ai/settings/keys
 
 ### RUN
 ```
-python test.py 
+python main.py 
 ```
 ### or 
 
