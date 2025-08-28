@@ -409,7 +409,7 @@ def _load_keys(env_name: str, files: list):
 def load_openai_keys():
     keys = _load_keys("OPENAI_API_KEYS", ["openai_keys.txt", "openai_key.txt"])
     if not keys: log_message("No API keys found for OpenAI", "WARNING")
-    else: log_message(f"OpenAI keys loaded: {len(ke)}", "INFO")
+    else: log_message(f"OpenAI keys loaded: {len(keys)}", "INFO")
     return keys
 
 def load_openrouter_keys():
@@ -503,7 +503,7 @@ def try_gemini(user_prompt, system_prompt, keys):
         for model in models:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
             try:
-                resp = requests.post(url, headers={"Content-Type":"application/json"}, jn=payload, timeout=15)
+                resp = requests.post(url, headers={"Content-Type":"application/json"}, json=payload, timeout=15)
             except Exception:
                 continue
             if resp.status_code == 200:
@@ -607,7 +607,6 @@ def send_message(channel_id, content, headers, reply_to_message_id=None, retry_c
     try:
         payload = {"content": content, "allowed_mentions": {"parse": []}}
         if reply_to_message_id:
-
             payload["message_reference"] = {"message_id": reply_to_message_id}
 
         response = requests.post(f"{BASE_URL}/channels/{channel_id}/messages", json=payload, headers=headers, timeout=10)
@@ -748,7 +747,7 @@ def worker_main():
         if not authorization:
             token_file = os.getenv("TOKEN_FILE_PATH", "token.txt")
             first_line = ""
-            with op(token_file, "r", encoding="utf-8") as f:
+            with open(token_file, "r", encoding="utf-8") as f:
                 for ln in f:
                     s = ln.strip()
                     if s and not s.startswith("#"):
@@ -938,7 +937,7 @@ def get_input(prompt_text: str, default: str = None):
         return input(Fore.CYAN + f"{prompt_text}: ").strip()
 
 def prompt_scan_settings_once() -> dict:
-    process_count = int(get_input("How many recent messages to scan eaccheck (1–100)", "15"))
+    process_count = int(get_input("How many recent messages to scan each check (1–100)", "15"))
     if process_count < 1 or process_count > 100: raise ValueError("Process count must be between 1 and 100")
     reply_chance = float(get_input("Reply chance for normal messages (0–1)", "1"))
     thread_reply_chance = float(get_input("Reply chance for replies in threads to others (0–1)", "0.08"))
