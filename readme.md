@@ -20,7 +20,7 @@ nano token.txt
 ```
 ### or on folder token.txt
 
-### apikey chatgpt use 1 or 3 
+### apikey chatgpt use 1 or ALL
 chatgpt 
 https://platform.openai.com/api-keys
 
@@ -47,7 +47,7 @@ nano deepsek_key.txt
 Groq
 https://console.groq.com/keys
 ```
-groq_keys.txt
+nano groq_keys.txt
 ```
 
 ### RUN
