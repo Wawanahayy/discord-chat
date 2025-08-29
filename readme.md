@@ -54,7 +54,8 @@ nano groq_keys.txt
 ```
 python main.py 
 ```
-### or 
+
+# or FOR SPAM
 
 ```
 python run.py
