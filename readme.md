@@ -22,25 +22,33 @@ nano token.txt
 
 ### apikey chatgpt use 1 or 3 
 chatgpt 
+https://platform.openai.com/api-keys
+
 ```
 nano openai_key.txt
 ```
-https://platform.openai.com/api-keys
-
 gemini is free but any limit`
+https://aistudio.google.com/app/apikey
+
 ```
 nano gemini_key.txt
 ```
-https://aistudio.google.com/app/apikey
 
 openrouter
+https://openrouter.ai/settings/keys
 ```
 nano openrouter_key.txt
 ```
-
-https://openrouter.ai/settings/keys
-
-
+deepseek
+https://platform.deepseek.com/api_keys
+```
+nano deepsek_key.txt
+```
+Groq
+https://console.groq.com/keys
+```
+groq_keys.txt
+```
 
 ### RUN
 ```
