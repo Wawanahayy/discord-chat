@@ -1127,11 +1127,11 @@ def build_base_env_from_env():
         "NAME_MENTION_PROB": os.getenv("NAME_MENTION_PROB", "0"),
         "MAX_THREAD_REPLIES": os.getenv("MAX_THREAD_REPLIES", "5"),
         "FOLLOWUP_CONTINUE_PROB": os.getenv("FOLLOWUP_CONTINUE_PROB", "1"),
-        "MIN_REPLY_DELAY": os.getenv("MIN_REPLY_DELAY", "3"),
+        "MIN_REPLY_DELAY": os.getenv("MIN_REPLY_DELAY", "5"),
         "MAX_REPLY_DELAY": os.getenv("MAX_REPLY_DELAY", "10"),
         "MIN_DELAY": os.getenv("MIN_DELAY", "5"),
-        "MAX_DELAY": os.getenv("MAX_DELAY", "9"),
-        "POST_SEND_COOLDOWN": os.getenv("POST_SEND_COOLDOWN", "30"),
+        "MAX_DELAY": os.getenv("MAX_DELAY", "10"),
+        "POST_SEND_COOLDOWN": os.getenv("POST_SEND_COOLDOWN", "46"),
     }
 
 # =============== ORCHESTRATOR MAIN ===============
@@ -1157,7 +1157,7 @@ if __name__ == "__main__":
             for ch in chs:
                 env = dict(base_env)
                 env.update({"TOKEN_VALUE": token, "CHANNEL_ID": ch, "STATE_FILE": f"state_t{ti}_{ch}.json",
-                            "EMOJI_ALLOWED": os.getenv("EMOJI_ALLOWED", "y"),
+                            "EMOJI_ALLOWED": os.getenv("EMOJI_ALLOWED", "n"),
                             "EMOJI_PERCENT": os.getenv("EMOJI_PERCENT", "25"),
                             "WORKER_SILENT": "1", "NON_INTERACTIVE": "1"})
                 log_message(f"READY ➜ ACCOUNT{ti} token={mask_token_display(token)} channel={ch}", "INFO")
