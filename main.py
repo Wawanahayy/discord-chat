@@ -10,7 +10,7 @@ HEADLESS = os.getenv("HEADLESS", "n").lower() == "y"
 
 POST_SEND_COOLDOWN = int(os.getenv("POST_SEND_COOLDOWN", "30"))
 MIN_WORDS = 5
-MAX_WORDS = 10
+MAX_WORDS = 15
 ALLOW_TIME_GREETINGS = False
 NAME_MENTION_PROB = 0.0
 MAX_THREAD_REPLIES = 3
@@ -227,10 +227,38 @@ def scrub_banned(resp: str, user_msg: str) -> str:
     r = re.sub(r"\bhey\s*bro\b", "hey", r, flags=re.I)
     r = re.sub(r"\bgood\b(?!\s+morning\b)", "", r, flags=re.I)
     r = re.sub(r"\bnice\b", "", r, flags=re.I)
+    # (tidak menghapus 'sounds'/'vibes' di sini)
     if not user_greeted(user_msg):
         r = re.sub(r"\bgood\s+morning\b", "", r, flags=re.I)
     r = re.sub(r"\s{2,}", " ", r).strip(" ,.-!?")
     return r
+
+def limit_vibes_sounds(text: str) -> str:
+    """
+    Batasi frekuensi kemunculan kata 'sound/sounds' dan 'vibe/vibes'.
+    - Munculan pertama: ~20% dipertahankan.
+    - Munculan berikutnya: ~10% dipertahankan.
+    """
+    if not text:
+        return text
+    pattern = re.compile(r"\b(sounds?|vibes?)\b", flags=re.I)
+    parts = []
+    last = 0
+    seen = 0
+    for m in pattern.finditer(text):
+        parts.append(text[last:m.start()])
+        seen += 1
+        keep_prob = 0.2 if seen == 1 else 0.10
+        if random.random() < keep_prob:
+            parts.append(m.group(0))  # pertahankan
+        else:
+            # dibuang saja (tanpa kata pengganti)
+            pass
+        last = m.end()
+    parts.append(text[last:])
+    out = "".join(parts)
+    out = re.sub(r"\s{2,}", " ", out).strip()
+    return out
 
 def sanitize_response(text: str, user_message: str) -> str:
     t = (text or "").replace("\n", " ").strip().strip('"').strip("'")
@@ -242,6 +270,8 @@ def sanitize_response(text: str, user_message: str) -> str:
         t = re.sub(r"\s{2,}", " ", t).strip(" ,.-!?")
     t = scrub_banned(t, user_message)
     if t.endswith("."): t = t[:-1]
+    # batasi 'sounds' / 'vibes'
+    t = limit_vibes_sounds(t)
     return t.strip()
 
 def clamp_words(text: str, min_w: int = MIN_WORDS, max_w: int = MAX_WORDS) -> str:
@@ -382,10 +412,9 @@ def partition_messages(messages, bot_user_id):
         normal.append(msg)
     return high_priority, thread_other, normal
 
-# =============== API KEYS (comma-separated) ===============
+# =============== API KEYS (comma-separated/file) ===============
 def _split_keys(raw: str):
     if not raw: return []
-    # allow commas OR newlines/semicolons
     parts = re.split(r"[,\n;]+", raw)
     return [p.strip() for p in parts if p.strip()]
 
@@ -397,6 +426,7 @@ def _read_file_first_line(path: str):
         return ""
 
 def _load_keys(env_name: str, files: list):
+    # Tanpa .env pun boleh: baca ENV kalau ada, kalau tidak baca file
     raw = os.getenv(env_name, "")
     if not raw:
         for fp in files:
@@ -422,6 +452,21 @@ def load_gemini_keys():
     keys = _load_keys("GEMINI_API_KEYS", ["gemini_keys.txt", "gemini_key.txt"])
     if not keys: log_message("No API keys found for Gemini", "WARNING")
     else: log_message(f"Gemini keys loaded: {len(keys)}", "INFO")
+    return keys
+
+# >>> NEW: DeepSeek & Groq keys loader
+def load_deepseek_keys():
+    keys = _load_keys("DEEPSEEK_API_KEYS", ["deepseek_keys.txt", "deepseek_key.txt"])
+    if not keys: log_message("No API keys found for DeepSeek", "WARNING")
+    else: log_message(f"DeepSeek keys loaded: {len(keys)}", "INFO")
+    return keys
+
+def load_groq_keys():
+    keys = _load_keys("GROQ_API_KEYS", ["groq_keys.txt", "groq_key.txt"])
+    if not keys:
+        log_message("No API keys found for Groq", "WARNING")
+    else:
+        log_message(f"Groq keys loaded: {len(keys)}", "INFO")
     return keys
 
 # =============== AI GENERATION ===============
@@ -458,9 +503,7 @@ def try_openai(user_prompt, system_prompt, keys):
                 ai = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
                 if ai: return ai
             elif resp.status_code in (401, 403, 429) or 500 <= resp.status_code < 600:
-                # invalid/blocked/rate-limited -> coba key lain
                 break
-            # 400 (model not allowed), coba model lain pada key yang sama
     return None
 
 def try_openrouter(user_prompt, system_prompt, keys):
@@ -491,11 +534,9 @@ def try_openrouter(user_prompt, system_prompt, keys):
 def try_gemini(user_prompt, system_prompt, keys):
     models = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
     prompt = (
-        "You are chatting casually in a Discord server. Reply naturally and briefly.\n"
-        "Tone: relaxed and friendly. Avoid time-based greetings unless the user did.\n"
-        "Answer in English only. 4–10 words.\n"
-        "Do not include the user's name in the reply.\n"
-        "Emojis: at most one; if globally disabled, don't use any unless the user references specific emoji keywords.\n\n"
+        "You're a laid-back, friendly Discord moderator, lighthearted, and understanding. "
+        "You're often friendly and helpful. "
+        "Reply naturally like a human, without excessive formality.\n\n"
         f"{user_prompt}\n"
     )
     payload = {"contents":[{"parts":[{"text": prompt}]}], "generationConfig":{"temperature":0.7,"topK":20,"topP":0.8,"maxOutputTokens":100}}
@@ -516,45 +557,119 @@ def try_gemini(user_prompt, system_prompt, keys):
                 except Exception:
                     pass
             elif resp.status_code in (401,403,429) or 500 <= resp.status_code < 600:
-                break  # coba key lain
+                break
+    return None
+
+def try_deepseek(user_prompt, system_prompt, keys):
+    models = [m.strip() for m in os.getenv("DEEPSEEK_MODELS", "deepseek-chat,deepseek-reasoner").split(",") if m.strip()]
+    url = "https://api.deepseek.com/v1/chat/completions"
+    payload_base = {
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "temperature": 0.7,
+        "max_tokens": 100,
+        "frequency_penalty": 0.2,
+    }
+    for key in keys:
+        for model in models:
+            payload = dict(payload_base); payload["model"] = model
+            try:
+                resp = requests.post(
+                    url,
+                    headers={"Authorization": f"Bearer {key}", "Content-Type":"application/json"},
+                    json=payload, timeout=15
+                )
+            except Exception:
+                continue
+            if resp.status_code == 200:
+                data = resp.json()
+                ai = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                if ai: return ai
+            elif resp.status_code in (401,403,429) or 500 <= resp.status_code < 600:
+                break
+    return None
+
+def try_groq(user_prompt, system_prompt, keys):
+    models = [m.strip() for m in os.getenv("GROQ_MODELS", "llama-3.1-8b-instant,llama-3.1-70b-versatile").split(",") if m.strip()]
+    url = "https://api.groq.com/openai/v1/chat/completions"  # OpenAI-compatible
+    payload_base = {
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "temperature": 0.7,
+        "max_tokens": 100,
+        "frequency_penalty": 0.2,
+    }
+    for key in keys:
+        for model in models:
+            payload = dict(payload_base); payload["model"] = model
+            try:
+                resp = requests.post(
+                    url,
+                    headers={"Authorization": f"Bearer {key}", "Content-Type":"application/json"},
+                    json=payload, timeout=15
+                )
+            except Exception:
+                continue
+            if resp.status_code == 200:
+                data = resp.json()
+                ai = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                if ai: return ai
+            elif resp.status_code in (401,403,429) or 500 <= resp.status_code < 600:
+                break
     return None
 
 def generate_ai_response(user_message, display_name):
     emoji_keywords = "shrimp, cow, moo, 🦐, 🐄"
     system_prompt = (
-        "You are a casual, friendly Discord chat assistant with a light moderator vibe. "
+        "You're a laid-back, friendly Discord moderator, lighthearted, and understanding. "
+        "You're often friendly and helpful. "
         "Reply naturally like a human, without excessive formality. "
-        "Avoid time-based greetings unless the user did. "
-        "Always answer in English. Keep it short: 4–10 words. "
-        "Do NOT include the user's name in the reply. "
-        "Emojis: at most one. If emojis are globally disabled, use none unless the user explicitly "
-        f"mentions one of: {emoji_keywords} or shows strong emotion (lol/haha/😂, 😭, ❤️). "
-        "For whitelist questions: 'Watch announcements; WL details posted there.' "
-        "For 'how to get WL': 'Follow announcements; stay active here and on X.' "
-        "For 'how to contribute': 'Stay active; upload art/memes; give feedback; post on X.' "
-        "If asked about your wellbeing: 'Doing well, thanks! How about you?'"
+        "Keep replies concise (5–15 words). "
+        "Do NOT include the user's name. "
+        "Use at most one emoji; skip if not necessary. "
+        f"If emojis are globally disabled, only use one when user shows strong emotion or mentions {emoji_keywords}."
     )
-    user_prompt = f'Message: "{user_message}"\nReply casually (4–15 words), English, max one emoji.\n'
+    user_prompt = f'Message: "{user_message}"\nReply casually (5–15 words), max one emoji.\n'
 
-    # order default: OpenAI -> OpenRouter -> Gemini (bisa ubah via env PROVIDERS_ORDER="openai,openrouter,gemini")
-    order_raw = os.getenv("PROVIDERS_ORDER", "openai,openrouter,gemini")
-    providers = [p.strip() for p in order_raw.split(",") if p.strip()]
+    # Default: DeepSeek -> Groq -> OpenAI -> OpenRouter -> Gemini
+    order_raw = os.getenv("PROVIDERS_ORDER", "deepseek,groq,openai,openrouter,gemini")
+    providers = [p.strip().lower() for p in order_raw.split(",") if p.strip()]
 
+    ds_keys     = load_deepseek_keys()
+    groq_keys   = load_groq_keys()
     openai_keys = load_openai_keys()
-    or_keys = load_openrouter_keys()
-    gem_keys = load_gemini_keys()
+    or_keys     = load_openrouter_keys()
+    gem_keys    = load_gemini_keys()
 
     for p in providers:
-        if p == "openai" and openai_keys:
+        if p == "deepseek" and ds_keys:
+            ai = try_deepseek(user_prompt, system_prompt, ds_keys)
+            if ai:
+                final, _ = _finalize_ai_text(ai, display_name, user_message)
+                return final, True
+
+        elif p == "groq" and groq_keys:
+            ai = try_groq(user_prompt, system_prompt, groq_keys)
+            if ai:
+                final, _ = _finalize_ai_text(ai, display_name, user_message)
+                return final, True
+
+        elif p == "openai" and openai_keys:
             ai = try_openai(user_prompt, system_prompt, openai_keys)
             if ai:
                 final, _ = _finalize_ai_text(ai, display_name, user_message)
                 return final, True
+
         elif p == "openrouter" and or_keys:
             ai = try_openrouter(user_prompt, system_prompt, or_keys)
             if ai:
                 final, _ = _finalize_ai_text(ai, display_name, user_message)
                 return final, True
+
         elif p == "gemini" and gem_keys:
             ai = try_gemini(user_prompt, system_prompt, gem_keys)
             if ai:
@@ -567,12 +682,9 @@ def generate_ai_response(user_message, display_name):
 # =============== DISCORD HTTP ===============
 def get_recent_messages(channel_id, headers, limit=50):
     try:
-        # Hormati rate-limit baca sebelum fetch
         _rl_sleep_if_needed(kind="read", prefix="Pre-fetch: ")
         url = f"{BASE_URL}/channels/{channel_id}/messages?limit={limit}"
         response = requests.get(url, headers=headers, timeout=10)
-
-        # Update state rate-limit dari header response
         _rl_update_from_headers(response, kind="read")
 
         if response.status_code == 200:
@@ -584,7 +696,6 @@ def get_recent_messages(channel_id, headers, limit=50):
             log_message("Bot doesn't have permission to read messages in this channel", "ERROR")
             return []
         elif response.status_code == 429:
-            # Sudah diset di _rl_update_from_headers; hormati Retry-After
             try:
                 ra = float(response.headers.get("retry-after") or response.headers.get("Retry-After") or "1")
             except Exception:
@@ -715,8 +826,8 @@ def worker_main():
         if MAX_REPLY_DELAY < MIN_REPLY_DELAY:
             MAX_REPLY_DELAY = MIN_REPLY_DELAY
 
-        min_delay = int(os.getenv("MIN_DELAY") or ("45" if (non_interactive or HEADLESS) else input(Fore.CYAN + "Minimum delay between checks (seconds): ").strip()))
-        max_delay = int(os.getenv("MAX_DELAY") or ("90" if (non_interactive or HEADLESS) else input(Fore.CYAN + "Maximum delay between checks (seconds): ").strip()))
+        min_delay = 45  # fixed: hardcode default
+        max_delay = 90  # fixed: hardcode default
         if min_delay < 1 or max_delay < min_delay:
             log_message("Invalid delay values", "ERROR")
             return
