@@ -9,7 +9,7 @@ from colorama import Fore, init
 HEADLESS = os.getenv("HEADLESS", "n").lower() == "y"
 
 POST_SEND_COOLDOWN = int(os.getenv("POST_SEND_COOLDOWN", "30"))
-MIN_WORDS = 5
+MIN_WORDS = 4
 MAX_WORDS = 15
 ALLOW_TIME_GREETINGS = False
 NAME_MENTION_PROB = 0.0
