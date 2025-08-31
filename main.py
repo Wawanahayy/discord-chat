@@ -292,7 +292,7 @@ MOOD_PATTERNS = {
     "confused": re.compile(r"\b(bingung|confus(ed)?|gimana|gmn)\b", re.I),
     "positive": re.compile(r"\b(nice|good|bagus|happy|senang|gembira|bahagia)\b", re.I),
 }
-MOOD_EMOJI = {"celebration":"🎉","gratitude":"🙏","success":"✅","agreement":"👍","humor":"😆","sad":"😕","confused":"🤔","positive":"🙂"}
+MOOD_EMOJI = {"celebration":"🥰","gratitude":"🙏","success":"😘","agreement":"😁","humor":"😆","sad":"😕","confused":"🤔","positive":"🙂"}
 MOOD_PRIORITY = ["celebration","gratitude","success","agreement","humor","positive","sad","confused"]
 
 def first_keyword_emoji(text: str):
